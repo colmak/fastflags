@@ -1,0 +1,370 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String             @id @default(cuid())
+  username         String?            @unique
+  email            String             @unique
+  displayName      String?            @map("display_name")
+  avatarUrl        String?            @map("avatar_url")
+  isVerified       Boolean            @default(false) @map("is_verified")
+  preferences      Json?
+  metadata         Json?
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  lastActive       DateTime?          @map("last_active")
+  isActive         Boolean            @default(true) @map("is_active")
+  accounts         Account[]
+  events           Event[]
+  gameParticipants GameParticipant[]
+  createdGames     GameSession[]      @relation("GameCreator")
+  leaderboards     Leaderboard[]
+  learningProgress LearningProgress[]
+  sessions         Session[]
+  settings         Setting[]
+  userAchievements UserAchievement[]
+  userStats        UserStats?
+
+  @@map("users")
+}
+
+model Account {
+  id                String    @id @default(cuid())
+  userId            String    @map("user_id")
+  provider          String
+  providerAccountId String    @map("provider_account_id")
+  accessToken       String?   @map("access_token")
+  refreshToken      String?   @map("refresh_token")
+  expiresAt         DateTime? @map("expires_at")
+  tokenType         String?   @map("token_type")
+  scope             String?
+  idToken           String?   @map("id_token")
+  sessionState      String?   @map("session_state")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model UserStats {
+  id            String   @id @default(cuid())
+  userId        String   @unique @map("user_id")
+  totalGames    Int      @default(0) @map("total_games")
+  totalWins     Int      @default(0) @map("total_wins")
+  totalLosses   Int      @default(0) @map("total_losses")
+  bestScore     Int      @default(0) @map("best_score")
+  bestStreak    Int      @default(0) @map("best_streak")
+  currentStreak Int      @default(0) @map("current_streak")
+  rating        Int      @default(1200)
+  ratingHistory Json?    @map("rating_history")
+  timePlayed    Int      @default(0) @map("time_played")
+  flagsMastered Int      @default(0) @map("flags_mastered")
+  perfectGames  Int      @default(0) @map("perfect_games")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([rating])
+  @@index([totalGames])
+  @@map("user_stats")
+}
+
+model ContentType {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  description  String?
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  contentItems ContentItem[]
+  gameSessions GameSession[]
+
+  @@map("content_types")
+}
+
+model Country {
+  id           String        @id @default(cuid())
+  name         String
+  code         String        @unique
+  continent    String
+  region       String?
+  population   BigInt?
+  areaKm2      Float?        @map("area_km2")
+  capital      String?
+  languages    String[]
+  currencies   String[]
+  metadata     Json?
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  contentItems ContentItem[]
+
+  @@index([continent])
+  @@index([region])
+  @@map("countries")
+}
+
+model ContentItem {
+  id               String             @id @default(cuid())
+  countryId        String             @map("country_id")
+  contentTypeId    String             @map("content_type_id")
+  title            String
+  description      String?
+  primaryUrl       String             @map("primary_url")
+  thumbnailUrl     String?            @map("thumbnail_url")
+  alternativeUrls  Json?              @map("alternative_urls")
+  difficulty       Int
+  tags             String[]
+  properties       Json?
+  isActive         Boolean            @default(true) @map("is_active")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  contentType      ContentType        @relation(fields: [contentTypeId], references: [id])
+  country          Country            @relation(fields: [countryId], references: [id])
+  gameQuestions    GameQuestion[]
+  learningProgress LearningProgress[]
+
+  @@unique([countryId, contentTypeId])
+  @@index([contentTypeId])
+  @@index([difficulty])
+  @@index([tags])
+  @@map("content_items")
+}
+
+model GameSession {
+  id            String            @id @default(cuid())
+  type          GameSessionType
+  mode          String?
+  status        GameSessionStatus
+  roomCode      String?           @map("room_code")
+  maxPlayers    Int               @default(2) @map("max_players")
+  timeLimit     Int               @default(60) @map("time_limit")
+  questionCount Int               @default(10) @map("question_count")
+  contentTypeId String            @map("content_type_id")
+  settings      Json?
+  metadata      Json?
+  createdBy     String?           @map("created_by")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  startedAt     DateTime?         @map("started_at")
+  endedAt       DateTime?         @map("ended_at")
+  participants  GameParticipant[]
+  questions     GameQuestion[]
+  contentType   ContentType       @relation(fields: [contentTypeId], references: [id])
+  creator       User?             @relation("GameCreator", fields: [createdBy], references: [id])
+
+  @@index([type, status])
+  @@index([roomCode])
+  @@map("game_sessions")
+}
+
+model GameParticipant {
+  id              String       @id @default(cuid())
+  gameSessionId   String       @map("game_session_id")
+  userId          String       @map("user_id")
+  score           Int          @default(0)
+  correctAnswers  Int          @default(0) @map("correct_answers")
+  wrongAnswers    Int          @default(0) @map("wrong_answers")
+  bonusPoints     Int          @default(0) @map("bonus_points")
+  finalRank       Int?         @map("final_rank")
+  ratingChange    Int          @default(0) @map("rating_change")
+  performanceData Json?        @map("performance_data")
+  joinedAt        DateTime     @default(now()) @map("joined_at")
+  finishedAt      DateTime?    @map("finished_at")
+  gameSession     GameSession  @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id])
+  answers         UserAnswer[]
+
+  @@unique([gameSessionId, userId])
+  @@index([userId])
+  @@map("game_participants")
+}
+
+model GameQuestion {
+  id             String       @id @default(cuid())
+  gameSessionId  String       @map("game_session_id")
+  contentItemId  String       @map("content_item_id")
+  questionOrder  Int          @map("question_order")
+  questionText   String?      @map("question_text")
+  answerOptions  Json?        @map("answer_options")
+  correctAnswers String[]     @map("correct_answers")
+  pointsValue    Int          @default(1) @map("points_value")
+  timeLimit      Int?         @map("time_limit")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  contentItem    ContentItem  @relation(fields: [contentItemId], references: [id])
+  gameSession    GameSession  @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+  answers        UserAnswer[]
+
+  @@index([gameSessionId, questionOrder])
+  @@map("game_questions")
+}
+
+model UserAnswer {
+  id                String          @id @default(cuid())
+  gameParticipantId String          @map("game_participant_id")
+  gameQuestionId    String          @map("game_question_id")
+  userAnswer        String          @map("user_answer")
+  isCorrect         Boolean         @map("is_correct")
+  isPartial         Boolean         @default(false) @map("is_partial")
+  confidenceScore   Float?          @map("confidence_score")
+  timeTaken         Int             @map("time_taken")
+  attempts          Int             @default(1)
+  hintUsed          Boolean         @default(false) @map("hint_used")
+  answeredAt        DateTime        @default(now()) @map("answered_at")
+  gameParticipant   GameParticipant @relation(fields: [gameParticipantId], references: [id], onDelete: Cascade)
+  gameQuestion      GameQuestion    @relation(fields: [gameQuestionId], references: [id], onDelete: Cascade)
+
+  @@index([gameParticipantId])
+  @@index([isCorrect])
+  @@map("user_answers")
+}
+
+model LearningProgress {
+  id                 String      @id @default(cuid())
+  userId             String      @map("user_id")
+  contentItemId      String      @map("content_item_id")
+  timesSeen          Int         @default(0) @map("times_seen")
+  timesCorrect       Int         @default(0) @map("times_correct")
+  timesIncorrect     Int         @default(0) @map("times_incorrect")
+  lastSeen           DateTime    @map("last_seen")
+  lastCorrect        DateTime?   @map("last_correct")
+  bestTime           Int?        @map("best_time")
+  averageTime        Int?        @map("average_time")
+  masteryLevel       Int         @default(0) @map("mastery_level")
+  nextReview         DateTime?   @map("next_review")
+  difficultyOverride Int?        @map("difficulty_override")
+  notes              String?
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  contentItem        ContentItem @relation(fields: [contentItemId], references: [id])
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentItemId])
+  @@index([userId, masteryLevel])
+  @@index([nextReview])
+  @@map("learning_progress")
+}
+
+model Leaderboard {
+  id                String            @id @default(cuid())
+  userId            String            @map("user_id")
+  category          String
+  period            LeaderboardPeriod
+  score             Int
+  rank              Int
+  additionalMetrics Json?             @map("additional_metrics")
+  periodStart       DateTime          @map("period_start")
+  periodEnd         DateTime?         @map("period_end")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, period, periodStart])
+  @@index([category, period, rank])
+  @@map("leaderboards")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  sessionToken String   @unique @map("session_token")
+  expires      DateTime
+  createdAt    DateTime @default(now()) @map("created_at")
+  lastAccessed DateTime @default(now()) @map("last_accessed")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+  @@map("sessions")
+}
+
+model Achievement {
+  id               String            @id @default(cuid())
+  key              String            @unique
+  name             String
+  description      String
+  iconUrl          String?           @map("icon_url")
+  category         String
+  criteria         Json
+  rewardType       String?           @map("reward_type")
+  rewardValue      Json?             @map("reward_value")
+  isActive         Boolean           @default(true) @map("is_active")
+  isSecret         Boolean           @default(false) @map("is_secret")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  userAchievements UserAchievement[]
+
+  @@index([category])
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String      @map("user_id")
+  achievementId String      @map("achievement_id")
+  progress      Json?
+  earnedAt      DateTime?   @map("earned_at")
+  isFavorite    Boolean     @default(false) @map("is_favorite")
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId, earnedAt])
+  @@map("user_achievements")
+}
+
+model Setting {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  category  String
+  key       String
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, key])
+  @@index([userId, category])
+  @@map("settings")
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  sessionId String?  @map("session_id")
+  eventType String   @map("event_type")
+  eventData Json     @map("event_data")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@map("events")
+}
+
+enum GameSessionType {
+  LEARNING
+  MULTIPLAYER
+  TOURNAMENT
+  CUSTOM
+}
+
+enum GameSessionStatus {
+  WAITING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum LeaderboardPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+  SEASONAL
+}
