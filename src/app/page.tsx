@@ -18,10 +18,10 @@ export default function Home() {
 
   const handleStartGame = async (settings: GameSettings) => {
     setIsLoading(true);
-    
+
     // TODO: Navigate to game page or start game logic
     console.log("Starting game with settings:", settings);
-    
+
     // Simulate loading
     setTimeout(() => {
       setIsLoading(false);
@@ -31,7 +31,9 @@ export default function Home() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-pulse text-gray-400 text-lg">loading game...</div>
+        <div className="animate-pulse text-gray-400 text-lg">
+          loading game...
+        </div>
       </div>
     );
   }
@@ -40,12 +42,12 @@ export default function Home() {
     <div className="min-h-screen bg-gray-900 text-gray-100">
       <FloatingFlags />
       <Header />
-      
+
       <main className="flex flex-col items-center justify-center flex-1 px-6 py-20">
         <GameControls onStartGame={handleStartGame} />
         <UserStats />
       </main>
-      
+
       <Footer />
     </div>
   );

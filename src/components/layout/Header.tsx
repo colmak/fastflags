@@ -38,11 +38,11 @@ export function Header() {
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2 text-sm text-gray-400">
               <User className="h-4 w-4" />
-              <span>{session.user?.name?.split(' ')[0] || 'user'}</span>
+              <span>{session.user?.name?.split(" ")[0] || "user"}</span>
             </div>
-            <Button 
-              onClick={() => signOut()} 
-              variant="ghost" 
+            <Button
+              onClick={() => signOut()}
+              variant="ghost"
               size="sm"
               className="text-gray-400 hover:text-gray-200"
             >

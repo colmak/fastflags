@@ -56,7 +56,9 @@ export function GameControls({ onStartGame }: GameControlsProps) {
 
       {/* Multiplayer requires login message */}
       {mode === "multiplayer" && !session && (
-        <p className="text-gray-500 text-sm mb-4">sign in required for multiplayer</p>
+        <p className="text-gray-500 text-sm mb-4">
+          sign in required for multiplayer
+        </p>
       )}
 
       {/* Settings Panel */}
