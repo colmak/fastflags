@@ -120,7 +120,7 @@ export function GameControls({ onStartGame }: GameControlsProps) {
             sign in to save progress and compete with others
           </p>
           <Button
-            onClick={() => signIn("google")}
+            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
             variant="outline"
             size="sm"
             className="border-gray-600 text-gray-400 hover:bg-gray-800"
