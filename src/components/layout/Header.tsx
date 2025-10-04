@@ -36,28 +36,22 @@ export function Header() {
   const rightFlags = decorativeFlags.slice(5, 10);
 
   return (
-    <header className="relative">
-      {/* Decorative flags - static, no animation */}
-      <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none overflow-hidden z-0">
-        <div className="flex space-x-2 opacity-10">
-          {leftFlags.map((flag, i) => (
-            <span key={`left-${i}`} className="text-2xl">{flag}</span>
-          ))}
+    <header className="p-6">
+      <div className="flex items-center justify-between gap-4">
+        {/* Left: Logo + Flags */}
+        <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center space-x-3">
+            <Flag className="h-6 w-6 text-yellow-400" />
+            <h1 className="text-xl font-medium text-gray-100">fastflags</h1>
+          </Link>
+          <div className="hidden lg:flex items-center gap-2">
+            {leftFlags.map((flag, i) => (
+              <span key={`left-${i}`} className="text-2xl">{flag}</span>
+            ))}
+          </div>
         </div>
-        <div className="flex space-x-2 opacity-10">
-          {rightFlags.map((flag, i) => (
-            <span key={`right-${i}`} className="text-2xl">{flag}</span>
-          ))}
-        </div>
-      </div>
 
-      {/* Main header content */}
-      <div className="relative z-10 flex items-center justify-between p-6">
-        <Link href="/" className="flex items-center space-x-3">
-          <Flag className="h-6 w-6 text-yellow-400" />
-          <h1 className="text-xl font-medium text-gray-100">fastflags</h1>
-        </Link>
-
+        {/* Center: Navigation */}
         <nav className="hidden md:flex items-center space-x-8 text-sm">
           {navItems.map((item) => {
             // Hide auth-required items if not logged in
@@ -83,7 +77,13 @@ export function Header() {
           })}
         </nav>
 
-        <div className="flex items-center space-x-4">
+        {/* Right: Flags + Auth */}
+        <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2">
+            {rightFlags.map((flag, i) => (
+              <span key={`right-${i}`} className="text-2xl">{flag}</span>
+            ))}
+          </div>
           {session ? (
             <div className="flex items-center space-x-3">
               <Link
