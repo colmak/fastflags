@@ -3,7 +3,6 @@
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import { Header } from "@/components/layout/Header";
-import { FloatingFlags } from "@/components/layout/FloatingFlags";
 import { Footer } from "@/components/layout/Footer";
 import { UserProfile } from "@/components/user/UserProfile";
 import { UserStats } from "@/components/user/UserStats";
@@ -28,11 +27,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100">
-      <FloatingFlags />
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
       <Header />
 
-      <main className="relative z-10 container mx-auto px-6 py-8">
+      <main className="flex-1 container mx-auto px-6 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-100 mb-2">Dashboard</h1>
           <p className="text-gray-400">
