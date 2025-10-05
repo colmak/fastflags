@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, XCircle, SkipForward } from "lucide-react";
+import { CheckCircle, XCircle } from "lucide-react";
 import type { GameMode } from "@/components/game/SettingsBar";
+import { countries, getCountriesByRegion, type Country } from "@/data/countries";
+import { lotrRegions, generateLotrQuestions } from "@/data/lotr";
+import { Flag, CustomFlag } from "@/components/ui/Flag";
 
 interface PracticeGameProps {
   mode: GameMode;
@@ -22,44 +24,55 @@ interface PracticeGameProps {
 
 interface Question {
   id: string;
-  flag: string;
+  flag: string; // Either country code or emoji for custom regions
   country: string;
   options: string[];
+  isCustomRegion?: boolean;
 }
 
-// Mock questions data
-const mockQuestions: Question[] = [
-  {
-    id: "1",
-    flag: "🇺🇸",
-    country: "United States",
-    options: ["United States", "Malaysia", "Liberia", "Uruguay"],
-  },
-  {
-    id: "2",
-    flag: "🇯🇵",
-    country: "Japan",
-    options: ["Japan", "Bangladesh", "Palau", "South Korea"],
-  },
-  {
-    id: "3",
-    flag: "🇫🇷",
-    country: "France",
-    options: ["France", "Netherlands", "Russia", "Luxembourg"],
-  },
-  {
-    id: "4",
-    flag: "🇩🇪",
-    country: "Germany",
-    options: ["Germany", "Belgium", "Estonia", "Austria"],
-  },
-  {
-    id: "5",
-    flag: "🇮🇹",
-    country: "Italy",
-    options: ["Italy", "Ireland", "Ivory Coast", "Mexico"],
-  },
-];
+// Helper function to generate question options
+function generateQuestionOptions(correctCountry: Country, allCountries: Country[]): string[] {
+  const options = [correctCountry.name];
+  const otherCountries = allCountries.filter((c) => c.name !== correctCountry.name);
+
+  // Pick 3 random wrong answers
+  const shuffled = [...otherCountries].sort(() => 0.5 - Math.random());
+  options.push(...shuffled.slice(0, 3).map((c) => c.name));
+
+  // Shuffle the options
+  return options.sort(() => 0.5 - Math.random());
+}
+
+// Helper function to generate questions from countries
+function generateCountryQuestions(regionId: string, count: number | "all"): Question[] {
+  // Check if this is an LOTR region
+  const isLotrRegion = lotrRegions.some((r) => r.id === regionId);
+
+  if (isLotrRegion) {
+    const lotrQuestions = generateLotrQuestions();
+    const questionCount = count === "all" ? lotrQuestions.length : Math.min(count, lotrQuestions.length);
+    return lotrQuestions.slice(0, questionCount).map((q) => ({
+      id: q.id,
+      flag: q.flag, // Keep emoji for LOTR
+      country: q.region,
+      options: q.options,
+      isCustomRegion: true,
+    }));
+  }
+
+  // Regular country questions
+  const regionCountries = getCountriesByRegion(regionId);
+  const shuffled = [...regionCountries].sort(() => 0.5 - Math.random());
+  const questionCount = count === "all" ? shuffled.length : Math.min(count, shuffled.length);
+
+  return shuffled.slice(0, questionCount).map((country, index) => ({
+    id: `${country.code}-${index}`,
+    flag: country.code, // Use country code instead of emoji
+    country: country.name,
+    options: generateQuestionOptions(country, regionCountries),
+    isCustomRegion: false,
+  }));
+}
 
 export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -84,13 +97,10 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
   }, [currentQuestionIndex, mode, showResult]);
 
   useEffect(() => {
-    // Initialize questions (shuffle and limit based on settings)
-    const shuffled = [...mockQuestions].sort(() => 0.5 - Math.random());
-    const count = settings.questionCount === "all" ? shuffled.length : settings.questionCount;
-    setGameQuestions(
-      shuffled.slice(0, Math.min(count, shuffled.length))
-    );
-  }, [settings.questionCount]);
+    // Initialize questions based on region and question count
+    const questions = generateCountryQuestions(settings.region, settings.questionCount);
+    setGameQuestions(questions);
+  }, [settings.region, settings.questionCount]);
 
 
   // Keyboard controls (only for visual/reverse modes)
@@ -215,7 +225,13 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
           {mode === "typing" ? (
             // Typing mode: Show flag, type country name
             <>
-              <div className="text-8xl mb-4">{currentQuestion.flag}</div>
+              <div className="mb-6 flex justify-center">
+                {currentQuestion.isCustomRegion ? (
+                  <CustomFlag emoji={currentQuestion.flag} size="xl" />
+                ) : (
+                  <Flag countryCode={currentQuestion.flag} size="xl" />
+                )}
+              </div>
               <p className="text-lg text-gray-300 mb-6">
                 Type the country name
               </p>
@@ -261,9 +277,20 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
               {/* Flag Options */}
               <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                 {currentQuestion.options.map((option, index) => {
-                  const flagForOption = mockQuestions.find(
-                    (q) => q.country === option
-                  )?.flag || "🏳️";
+                  // For reverse mode, find the flag for this country option
+                  const isCustomRegion = currentQuestion.isCustomRegion;
+                  let flagCode = "";
+                  let flagEmoji = "🏳️";
+
+                  if (isCustomRegion) {
+                    // Find LOTR region flag
+                    const lotrRegion = lotrRegions.find((r) => r.name === option);
+                    flagEmoji = lotrRegion?.flag || "🏳️";
+                  } else {
+                    // Find country code
+                    const country = countries.find((c) => c.name === option);
+                    flagCode = country?.code || "";
+                  }
 
                   let buttonClass =
                     "p-6 rounded-lg border transition-all text-center ";
@@ -292,7 +319,13 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
                         <kbd className="px-2 py-1 bg-gray-800 rounded text-xs font-mono text-gray-500">
                           {index + 1}
                         </kbd>
-                        <div className="text-6xl">{flagForOption}</div>
+                        <div className="flex justify-center">
+                          {isCustomRegion ? (
+                            <CustomFlag emoji={flagEmoji} size="lg" />
+                          ) : (
+                            flagCode && <Flag countryCode={flagCode} size="lg" />
+                          )}
+                        </div>
                       </div>
                     </button>
                   );
@@ -302,7 +335,13 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
           ) : (
             // Visual mode: Show flag, pick country name
             <>
-              <div className="text-8xl mb-4">{currentQuestion.flag}</div>
+              <div className="mb-6 flex justify-center">
+                {currentQuestion.isCustomRegion ? (
+                  <CustomFlag emoji={currentQuestion.flag} size="xl" />
+                ) : (
+                  <Flag countryCode={currentQuestion.flag} size="xl" />
+                )}
+              </div>
               <p className="text-lg text-gray-300 mb-6">
                 Which country does this flag belong to?
               </p>
