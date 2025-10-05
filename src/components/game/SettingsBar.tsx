@@ -1,6 +1,7 @@
 "use client";
 
-import { Clock, Globe, Hash, Eye, Keyboard, Repeat } from "lucide-react";
+import { Globe, Hash, Eye, Keyboard, Repeat } from "lucide-react";
+import { standardRegions } from "@/data/countries";
 
 export type GameMode = "visual" | "typing" | "reverse";
 
@@ -21,15 +22,17 @@ export function SettingsBar({
   questionCount,
   onQuestionCountChange,
 }: SettingsBarProps) {
-  const regions = [
-    { value: "all", label: "all" },
-    { value: "europe", label: "europe" },
-    { value: "asia", label: "asia" },
-    { value: "africa", label: "africa" },
-    { value: "north-america", label: "n. america" },
-    { value: "south-america", label: "s. america" },
-    { value: "oceania", label: "oceania" },
-  ];
+  // Map standard regions to display format
+  const regions = standardRegions.map((r) => ({
+    value: r.id,
+    label: r.id === "all"
+      ? "all"
+      : r.id === "north-america"
+      ? "n. america"
+      : r.id === "south-america"
+      ? "s. america"
+      : r.id,
+  }));
 
   const modes: { value: GameMode; label: string; icon: typeof Eye }[] = [
     { value: "visual", label: "visual", icon: Eye },
