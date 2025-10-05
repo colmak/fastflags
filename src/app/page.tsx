@@ -147,6 +147,11 @@ export default function Home() {
       <CommandPalette
         isOpen={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
+        mode={mode}
+        onModeChange={(m) => {
+          setMode(m);
+          handleRestart();
+        }}
         region={region}
         onRegionChange={(r) => {
           setRegion(r);
