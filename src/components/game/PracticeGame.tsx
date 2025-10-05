@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, XCircle } from "lucide-react";
 import type { GameMode } from "@/components/game/SettingsBar";
@@ -82,19 +82,133 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
   const [showResult, setShowResult] = useState(false);
   const [gameQuestions, setGameQuestions] = useState<Question[]>([]);
   const [gameStartTime] = useState(Date.now());
+  const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<string[]>([]);
   const typingInputRef = useRef<HTMLInputElement>(null);
 
   const currentQuestion = gameQuestions[currentQuestionIndex];
+
+  // Calculate similarity score for autocomplete ranking
+  const calculateSimilarity = useCallback((input: string, country: string): number => {
+    const normalizedInput = input.toLowerCase().trim();
+    const normalizedCountry = country.toLowerCase();
+
+    if (!normalizedInput) return 0;
+
+    // Exact match gets highest score
+    if (normalizedInput === normalizedCountry) return 1000;
+
+    let score = 0;
+
+    // Starts with input (very high score)
+    if (normalizedCountry.startsWith(normalizedInput)) {
+      score += 100 + (normalizedInput.length / normalizedCountry.length) * 50;
+    }
+
+    // Contains input as substring
+    if (normalizedCountry.includes(normalizedInput)) {
+      score += 50;
+    }
+
+    // Word boundary match (e.g., "united" matches "United States")
+    if (normalizedCountry.includes(` ${normalizedInput}`)) {
+      score += 60;
+    }
+
+    // Character-by-character fuzzy match
+    let countryIndex = 0;
+    let matchedChars = 0;
+    for (let i = 0; i < normalizedInput.length; i++) {
+      const charIndex = normalizedCountry.indexOf(normalizedInput[i], countryIndex);
+      if (charIndex !== -1) {
+        matchedChars++;
+        countryIndex = charIndex + 1;
+      }
+    }
+
+    if (matchedChars === normalizedInput.length) {
+      score += (matchedChars / normalizedCountry.length) * 30;
+    }
+
+    // Bonus for matching more characters
+    score += (normalizedInput.length / normalizedCountry.length) * 10;
+
+    return score;
+  }, []);
+
+  // Fuzzy match function for typing mode
+  const fuzzyMatchCountry = (input: string, country: string): boolean => {
+    const normalizedInput = input.toLowerCase().trim();
+    const normalizedCountry = country.toLowerCase();
+
+    // Exact match
+    if (normalizedInput === normalizedCountry) return true;
+
+    // Check if country starts with input
+    if (normalizedCountry.startsWith(normalizedInput)) return true;
+
+    // Check if country contains input as a word
+    if (normalizedCountry.includes(` ${normalizedInput}`)) return true;
+
+    // Fuzzy character-by-character match (all input chars appear in order)
+    let countryIndex = 0;
+    for (let i = 0; i < normalizedInput.length; i++) {
+      countryIndex = normalizedCountry.indexOf(normalizedInput[i], countryIndex);
+      if (countryIndex === -1) return false;
+      countryIndex++;
+    }
+
+    // Additional check: similarity threshold (at least 80% of input matches country)
+    const minLength = Math.min(normalizedInput.length, normalizedCountry.length);
+    if (normalizedInput.length < minLength * 0.8) return false;
+
+    return true;
+  };
+
+  // Get autocomplete suggestions based on current input
+  const getAutocompleteSuggestions = useCallback((input: string): string[] => {
+    if (!input.trim() || showResult) {
+      return [];
+    }
+
+    // Get all unique country names from all game questions
+    const allCountryNames = new Set<string>();
+    gameQuestions.forEach((q) => {
+      allCountryNames.add(q.country);
+      q.options.forEach((opt) => allCountryNames.add(opt));
+    });
+    const availableOptions = Array.from(allCountryNames);
+
+    // Score each option
+    const scoredOptions = availableOptions
+      .map((option) => ({
+        name: option,
+        score: calculateSimilarity(input, option),
+      }))
+      .filter((option) => option.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5) // Show top 5 suggestions
+      .map((option) => option.name);
+
+    return scoredOptions;
+  }, [showResult, gameQuestions, calculateSimilarity]);
+
   const isCorrect = mode === "typing"
-    ? typedAnswer.toLowerCase().trim() === currentQuestion?.country.toLowerCase()
+    ? currentQuestion && (
+        fuzzyMatchCountry(typedAnswer, currentQuestion.country) ||
+        (autocompleteSuggestions.length > 0 && fuzzyMatchCountry(autocompleteSuggestions[0], currentQuestion.country))
+      )
     : selectedAnswer === currentQuestion?.country || selectedAnswer === currentQuestion?.flag;
 
-  // Auto-focus typing input when question changes
+  // Auto-focus typing input when question changes or mode changes
   useEffect(() => {
     if (mode === "typing" && typingInputRef.current && !showResult) {
-      typingInputRef.current.focus();
+      // Small delay to ensure DOM is ready
+      const timeoutId = setTimeout(() => {
+        typingInputRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timeoutId);
     }
-  }, [currentQuestionIndex, mode, showResult]);
+  }, [currentQuestionIndex, mode, showResult, gameQuestions.length]);
 
   useEffect(() => {
     // Initialize questions based on region and question count
@@ -102,6 +216,15 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
     setGameQuestions(questions);
   }, [settings.region, settings.questionCount]);
 
+  // Update autocomplete suggestions when typing
+  useEffect(() => {
+    if (mode === "typing" && !showResult) {
+      const suggestions = getAutocompleteSuggestions(typedAnswer);
+      setAutocompleteSuggestions(suggestions);
+    } else {
+      setAutocompleteSuggestions([]);
+    }
+  }, [typedAnswer, mode, showResult, getAutocompleteSuggestions, gameQuestions.length]);
 
   // Keyboard controls (only for visual/reverse modes)
   useEffect(() => {
@@ -142,8 +265,12 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
 
     setShowResult(true);
 
-    // Fuzzy match check
-    const isMatch = typedAnswer.toLowerCase().trim() === currentQuestion.country.toLowerCase();
+    // Check if either the typed answer OR the top autocomplete suggestion is correct
+    const typedMatch = fuzzyMatchCountry(typedAnswer, currentQuestion.country);
+    const topSuggestion = autocompleteSuggestions.length > 0 ? autocompleteSuggestions[0] : null;
+    const suggestionMatch = topSuggestion ? fuzzyMatchCountry(topSuggestion, currentQuestion.country) : false;
+
+    const isMatch = typedMatch || suggestionMatch;
 
     if (isMatch) {
       setScore((prev) => prev + 1);
@@ -152,6 +279,14 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
     // Auto-advance after 100ms
     setTimeout(() => {
       handleNext();
+    }, 100);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setTypedAnswer(suggestion);
+    // Auto-submit after selecting suggestion
+    setTimeout(() => {
+      handleTypingSubmit();
     }, 100);
   };
 
@@ -179,18 +314,8 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
     handleNext();
   };
 
-  if (gameQuestions.length === 0) {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-8 text-center">
-            <div className="animate-pulse text-gray-400">
-              Loading questions...
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  if (gameQuestions.length === 0 || !currentQuestion) {
+    return null;
   }
 
   return (
@@ -251,6 +376,26 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
                   placeholder="Country name..."
                   className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-gray-300 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                 />
+
+                {/* Autocomplete Suggestions */}
+                {!showResult && autocompleteSuggestions.length > 0 && (
+                  <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg overflow-hidden">
+                    {autocompleteSuggestions.map((suggestion, index) => (
+                      <button
+                        key={suggestion}
+                        onClick={() => handleSuggestionClick(suggestion)}
+                        className={`w-full px-4 py-3 text-left text-sm transition-colors ${
+                          index === 0
+                            ? "bg-gray-700 text-gray-300"
+                            : "text-gray-300 hover:bg-gray-700"
+                        }`}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {showResult && (
                   <div className="mt-4 text-sm">
                     {isCorrect ? (
