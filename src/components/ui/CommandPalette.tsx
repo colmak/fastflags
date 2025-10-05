@@ -1,28 +1,35 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Clock, Globe, Hash, X, Search } from "lucide-react";
+import { Globe, Hash, X, Search, Eye, Keyboard, Repeat, Sparkles, ChevronRight } from "lucide-react";
+import { standardRegions } from "@/data/countries";
+import { lotrRegions } from "@/data/lotr";
+import type { GameMode } from "@/components/game/SettingsBar";
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
+  mode: GameMode;
+  onModeChange: (mode: GameMode) => void;
   region: string;
   onRegionChange: (region: string) => void;
   questionCount: number | "all";
   onQuestionCountChange: (count: number | "all") => void;
 }
 
+type NavigationPath = ("main" | "mode" | "region" | "custom-regions" | "lotr" | "questions")[];
+
 export function CommandPalette({
   isOpen,
   onClose,
+  mode,
+  onModeChange,
   region,
   onRegionChange,
   questionCount,
   onQuestionCountChange,
 }: CommandPaletteProps) {
-  const [selectedCategory, setSelectedCategory] = useState<
-    "region" | "questions" | null
-  >(null);
+  const [navigationPath, setNavigationPath] = useState<NavigationPath>(["main"]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -31,12 +38,12 @@ export function CommandPalette({
     if (isOpen) {
       searchInputRef.current?.focus();
     }
-  }, [isOpen, selectedCategory]);
+  }, [isOpen, navigationPath]);
 
   useEffect(() => {
     if (!isOpen) {
       setSearchQuery("");
-      setSelectedCategory(null);
+      setNavigationPath(["main"]);
       setSelectedIndex(0);
     }
   }, [isOpen]);
@@ -46,24 +53,154 @@ export function CommandPalette({
     setSelectedIndex(0);
   }, [searchQuery]);
 
+  const currentView = navigationPath[navigationPath.length - 1];
+
+  const modes = [
+    { value: "visual", label: "Visual", icon: Eye },
+    { value: "typing", label: "Typing", icon: Keyboard },
+    { value: "reverse", label: "Reverse", icon: Repeat },
+  ];
+
+  const questionCounts: (number | "all")[] = [10, 15, 20, 30, "all"];
+
+  // Fuzzy search function
+  const fuzzyMatch = (text: string, query: string): boolean => {
+    if (!query) return true;
+    const lowerText = text.toLowerCase();
+    const lowerQuery = query.toLowerCase();
+
+    let textIndex = 0;
+    for (let i = 0; i < lowerQuery.length; i++) {
+      textIndex = lowerText.indexOf(lowerQuery[i], textIndex);
+      if (textIndex === -1) return false;
+      textIndex++;
+    }
+    return true;
+  };
+
+  const navigateTo = (view: NavigationPath[number]) => {
+    setNavigationPath([...navigationPath, view]);
+    setSearchQuery("");
+    setSelectedIndex(0);
+  };
+
+  const navigateBack = () => {
+    if (navigationPath.length > 1) {
+      setNavigationPath(navigationPath.slice(0, -1));
+      setSearchQuery("");
+      setSelectedIndex(0);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleSelect = (category: string, value: string | number | "all") => {
+    if (category === "mode") {
+      onModeChange(value as GameMode);
+    } else if (category === "region") {
+      onRegionChange(value as string);
+    } else if (category === "questions") {
+      onQuestionCountChange(value as number | "all");
+    }
+    onClose();
+    setNavigationPath(["main"]);
+    setSearchQuery("");
+  };
+
+  // Get display value for region
+  const getRegionDisplayValue = () => {
+    if (region === "lotr") return "Middle-earth";
+    const standardRegion = standardRegions.find((r) => r.id === region);
+    if (standardRegion) return standardRegion.name;
+    const lotrRegion = lotrRegions.find((r) => r.id === region);
+    if (lotrRegion) return lotrRegion.name;
+    return region;
+  };
+
+  // Get current items based on navigation path
+  const getCurrentItems = () => {
+    if (currentView === "main") {
+      return [
+        {
+          id: "mode",
+          icon: modes.find((m) => m.value === mode)?.icon || Eye,
+          label: "Mode",
+          value: mode,
+        },
+        {
+          id: "region",
+          icon: Globe,
+          label: "Region",
+          value: getRegionDisplayValue(),
+        },
+        {
+          id: "questions",
+          icon: Hash,
+          label: "Question count",
+          value: questionCount,
+        },
+      ].filter((item) => fuzzyMatch(item.label, searchQuery));
+    }
+
+    if (currentView === "mode") {
+      return modes.filter((m) => fuzzyMatch(m.label, searchQuery));
+    }
+
+    if (currentView === "region") {
+      const standardRegionOptions = standardRegions
+        .filter((r) => fuzzyMatch(r.name, searchQuery))
+        .map((r) => ({ ...r, type: "standard" as const }));
+
+      const customRegionOption = fuzzyMatch("Custom regions", searchQuery)
+        ? [
+            {
+              id: "custom-regions",
+              name: "Custom regions",
+              icon: Sparkles,
+              type: "submenu" as const,
+            },
+          ]
+        : [];
+
+      return [...standardRegionOptions, ...customRegionOption];
+    }
+
+    if (currentView === "custom-regions") {
+      return [
+        {
+          id: "lotr",
+          name: "Lord of the Rings",
+          description: "Middle-earth regions",
+          type: "submenu" as const,
+        },
+      ].filter((item) => fuzzyMatch(item.name, searchQuery));
+    }
+
+    if (currentView === "lotr") {
+      return lotrRegions.filter((r) => fuzzyMatch(r.name, searchQuery));
+    }
+
+    if (currentView === "questions") {
+      return questionCounts.filter((count) =>
+        fuzzyMatch(
+          count === "all" ? "all questions" : `${count} questions`,
+          searchQuery
+        )
+      );
+    }
+
+    return [];
+  };
+
+  const currentItems = getCurrentItems();
+
   useEffect(() => {
     if (!isOpen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Get current filtered items
-      const currentItems = !selectedCategory
-        ? mainMenuItems
-        : getFilteredOptions();
-
       if (e.key === "Escape") {
         e.preventDefault();
-        if (selectedCategory) {
-          setSelectedCategory(null);
-          setSearchQuery("");
-          setSelectedIndex(0);
-        } else {
-          onClose();
-        }
+        navigateBack();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         setSelectedIndex((prev) =>
@@ -76,83 +213,39 @@ export function CommandPalette({
         );
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (!selectedCategory && mainMenuItems.length > 0) {
-          const selected = mainMenuItems[selectedIndex];
-          setSelectedCategory(selected.id as "region" | "questions");
-          setSearchQuery("");
-          setSelectedIndex(0);
-        } else if (selectedCategory && currentItems.length > 0) {
-          const selected = currentItems[selectedIndex];
-          if (selectedCategory === "region") {
-            handleSelect("region", (selected as any).value);
-          } else if (selectedCategory === "questions") {
-            handleSelect("questions", selected as number | "all");
+        if (currentItems.length === 0) return;
+
+        const selected = currentItems[selectedIndex];
+
+        if (currentView === "main") {
+          const mainItem = selected as { id: string; icon: React.ComponentType; label: string; value: string | number };
+          navigateTo(mainItem.id as NavigationPath[number]);
+        } else if (currentView === "mode") {
+          const modeItem = selected as typeof modes[number];
+          handleSelect("mode", modeItem.value);
+        } else if (currentView === "region") {
+          const regionItem = selected as { id: string; type?: string };
+          if (regionItem.type === "submenu") {
+            navigateTo(regionItem.id as NavigationPath[number]);
+          } else {
+            handleSelect("region", regionItem.id);
           }
+        } else if (currentView === "custom-regions") {
+          navigateTo("lotr");
+        } else if (currentView === "lotr") {
+          const lotrItem = selected as typeof lotrRegions[number];
+          handleSelect("region", lotrItem.id);
+        } else if (currentView === "questions") {
+          handleSelect("questions", selected as number | "all");
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, selectedCategory, selectedIndex, searchQuery, onClose]);
+  }, [isOpen, currentView, selectedIndex, searchQuery, currentItems.length]);
 
   if (!isOpen) return null;
-
-  const regions = [
-    { value: "all", label: "All regions" },
-    { value: "europe", label: "Europe" },
-    { value: "asia", label: "Asia" },
-    { value: "africa", label: "Africa" },
-    { value: "north-america", label: "North America" },
-    { value: "south-america", label: "South America" },
-    { value: "oceania", label: "Oceania" },
-  ];
-  const questionCounts: (number | "all")[] = [10, 15, 20, 30, "all"];
-
-  // Fuzzy search function
-  const fuzzyMatch = (text: string, query: string): boolean => {
-    if (!query) return true;
-    const lowerText = text.toLowerCase();
-    const lowerQuery = query.toLowerCase();
-
-    // Simple fuzzy matching: check if all characters appear in order
-    let textIndex = 0;
-    for (let i = 0; i < lowerQuery.length; i++) {
-      textIndex = lowerText.indexOf(lowerQuery[i], textIndex);
-      if (textIndex === -1) return false;
-      textIndex++;
-    }
-    return true;
-  };
-
-  const handleSelect = (category: string, value: string | number | "all") => {
-    if (category === "region") {
-      onRegionChange(value as string);
-    } else if (category === "questions") {
-      onQuestionCountChange(value as number | "all");
-    }
-    onClose();
-    setSelectedCategory(null);
-    setSearchQuery("");
-  };
-
-  // Filter main menu items
-  const mainMenuItems = [
-    { id: "region", icon: Globe, label: "Region", value: region === "all" ? "All regions" : region },
-    { id: "questions", icon: Hash, label: "Question count", value: questionCount },
-  ].filter(item => fuzzyMatch(item.label, searchQuery));
-
-  // Filter options based on category
-  const getFilteredOptions = () => {
-    if (selectedCategory === "region") {
-      return regions.filter(r => fuzzyMatch(r.label, searchQuery));
-    } else if (selectedCategory === "questions") {
-      return questionCounts.filter(count =>
-        fuzzyMatch(count === "all" ? "all questions" : `${count} questions`, searchQuery)
-      );
-    }
-    return [];
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-32 bg-black bg-opacity-60">
@@ -164,7 +257,11 @@ export function CommandPalette({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder={selectedCategory ? "Search options..." : "Search settings..."}
+              placeholder={
+                currentView === "main"
+                  ? "Search settings..."
+                  : "Search options..."
+              }
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 bg-transparent border-none outline-none text-sm text-gray-300 placeholder-gray-500"
@@ -182,31 +279,25 @@ export function CommandPalette({
 
         {/* Content */}
         <div className="p-2 max-h-96 overflow-y-auto">
-          {!selectedCategory ? (
-            // Main menu
+          {currentView === "main" && (
             <div className="space-y-1">
-              {mainMenuItems.length > 0 ? (
-                mainMenuItems.map((item, index) => {
-                  const Icon = item.icon;
+              {currentItems.length > 0 ? (
+                currentItems.map((item, index) => {
+                  const mainItem = item as { id: string; icon: React.ComponentType<{ className?: string }>; label: string; value: string | number };
+                  const Icon = mainItem.icon;
                   const isSelected = index === selectedIndex;
                   return (
                     <button
-                      key={item.id}
-                      onClick={() => {
-                        setSelectedCategory(item.id as "region" | "questions");
-                        setSearchQuery("");
-                        setSelectedIndex(0);
-                      }}
+                      key={mainItem.id}
+                      onClick={() => navigateTo(mainItem.id as NavigationPath[number])}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                        isSelected
-                          ? "bg-gray-700"
-                          : "hover:bg-gray-700"
+                        isSelected ? "bg-gray-700" : "hover:bg-gray-700"
                       }`}
                     >
                       <Icon className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm text-gray-300">{item.label}</span>
+                      <span className="text-sm text-gray-300">{mainItem.label}</span>
                       <span className="ml-auto text-xs text-gray-500">
-                        {item.value}
+                        {mainItem.value}
                       </span>
                     </button>
                   );
@@ -217,25 +308,28 @@ export function CommandPalette({
                 </div>
               )}
             </div>
-          ) : selectedCategory === "region" ? (
-            // Region options
+          )}
+
+          {currentView === "mode" && (
             <div className="space-y-1">
-              {getFilteredOptions().length > 0 ? (
-                (getFilteredOptions() as typeof regions).map((r, index) => {
+              {currentItems.length > 0 ? (
+                (currentItems as typeof modes).map((m, index) => {
                   const isSelected = index === selectedIndex;
+                  const Icon = m.icon;
                   return (
                     <button
-                      key={r.value}
-                      onClick={() => handleSelect("region", r.value)}
-                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors ${
-                        region === r.value
+                      key={m.value}
+                      onClick={() => handleSelect("mode", m.value)}
+                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors flex items-center gap-2 ${
+                        mode === m.value
                           ? "bg-yellow-400 text-gray-900"
                           : isSelected
                           ? "bg-gray-700 text-gray-300"
                           : "hover:bg-gray-700 text-gray-300"
                       }`}
                     >
-                      <span className="text-sm">{r.label}</span>
+                      <Icon className="h-4 w-4" />
+                      <span className="text-sm">{m.label}</span>
                     </button>
                   );
                 })
@@ -245,11 +339,132 @@ export function CommandPalette({
                 </div>
               )}
             </div>
-          ) : (
-            // Question count options
+          )}
+
+          {currentView === "region" && (
             <div className="space-y-1">
-              {getFilteredOptions().length > 0 ? (
-                (getFilteredOptions() as (number | "all")[]).map((count, index) => {
+              {currentItems.length > 0 ? (
+                currentItems.map((item, index) => {
+                  const regionItem = item as { id: string; name: string; type?: string };
+                  const isSelected = index === selectedIndex;
+
+                  if (regionItem.type === "submenu") {
+                    return (
+                      <button
+                        key={regionItem.id}
+                        onClick={() => navigateTo(regionItem.id as NavigationPath[number])}
+                        className={`w-full px-4 py-3 rounded-lg text-left transition-colors flex items-center gap-2 ${
+                          isSelected
+                            ? "bg-gray-700 text-gray-300"
+                            : "hover:bg-gray-700 text-gray-300"
+                        }`}
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        <span className="text-sm">{regionItem.name}</span>
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={regionItem.id}
+                      onClick={() => handleSelect("region", regionItem.id)}
+                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors ${
+                        region === regionItem.id
+                          ? "bg-yellow-400 text-gray-900"
+                          : isSelected
+                          ? "bg-gray-700 text-gray-300"
+                          : "hover:bg-gray-700 text-gray-300"
+                      }`}
+                    >
+                      <span className="text-sm">{regionItem.name}</span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="px-4 py-8 text-center text-sm text-gray-500">
+                  No results found
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentView === "custom-regions" && (
+            <div className="space-y-1">
+              {currentItems.length > 0 ? (
+                currentItems.map((item, index) => {
+                  const customRegionItem = item as { id: string; name: string; description: string };
+                  const isSelected = index === selectedIndex;
+                  return (
+                    <button
+                      key={customRegionItem.id}
+                      onClick={() => navigateTo("lotr")}
+                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors flex items-center gap-2 ${
+                        isSelected
+                          ? "bg-gray-700 text-gray-300"
+                          : "hover:bg-gray-700 text-gray-300"
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">{customRegionItem.name}</div>
+                        <div className="text-xs text-gray-400">
+                          {customRegionItem.description}
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="px-4 py-8 text-center text-sm text-gray-500">
+                  No results found
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentView === "lotr" && (
+            <div className="space-y-1">
+              {currentItems.length > 0 ? (
+                (currentItems as typeof lotrRegions).map((r, index) => {
+                  const isSelected = index === selectedIndex;
+                  return (
+                    <button
+                      key={r.id}
+                      onClick={() => handleSelect("region", r.id)}
+                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors ${
+                        region === r.id
+                          ? "bg-yellow-400 text-gray-900"
+                          : isSelected
+                          ? "bg-gray-700 text-gray-300"
+                          : "hover:bg-gray-700 text-gray-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{r.flag}</span>
+                        <div>
+                          <div className="text-sm font-medium">{r.name}</div>
+                          <div className="text-xs opacity-70">
+                            {r.description}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="px-4 py-8 text-center text-sm text-gray-500">
+                  No results found
+                </div>
+              )}
+            </div>
+          )}
+
+          {currentView === "questions" && (
+            <div className="space-y-1">
+              {currentItems.length > 0 ? (
+                (currentItems as (number | "all")[]).map((count, index) => {
                   const isSelected = index === selectedIndex;
                   return (
                     <button
@@ -281,7 +496,7 @@ export function CommandPalette({
         {/* Footer hint */}
         <div className="p-3 border-t border-gray-700 text-xs text-gray-500 text-center">
           Press <kbd className="px-1.5 py-0.5 bg-gray-900 rounded">esc</kbd> to{" "}
-          {selectedCategory ? "go back" : "close"}
+          {navigationPath.length > 1 ? "go back" : "close"}
         </div>
       </div>
     </div>
