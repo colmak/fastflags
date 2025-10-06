@@ -1,4 +1,5 @@
 import countryFlagEmoji from "country-flag-emoji";
+import * as FlagIcons from "country-flag-icons/react/3x2";
 
 export interface Country {
   name: string;
@@ -72,6 +73,7 @@ const regionMapping: Record<string, string> = {
 };
 
 // Get all countries from country-flag-emoji and map to our structure
+// Filter out countries that don't have a corresponding flag in country-flag-icons
 export const countries: Country[] = countryFlagEmoji.list
   .map((flag) => ({
     name: flag.name,
@@ -79,6 +81,11 @@ export const countries: Country[] = countryFlagEmoji.list
     emoji: flag.emoji,
     region: regionMapping[flag.code] || "other",
   }))
+  .filter((country) => {
+    // Check if the flag exists in country-flag-icons
+    const flagComponent = FlagIcons[country.code.toUpperCase() as keyof typeof FlagIcons];
+    return flagComponent !== undefined;
+  })
   .sort((a, b) => a.name.localeCompare(b.name));
 
 // Standard regions
