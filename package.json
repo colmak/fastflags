@@ -23,6 +23,8 @@
     "clsx": "^2.1.1",
     "country-flag-emoji": "^1.0.3",
     "country-flag-icons": "^1.5.21",
+    "firebase": "^12.3.0",
+    "firebase-admin": "^13.5.0",
     "lucide-react": "^0.543.0",
     "next": "15.5.2",
     "next-auth": "^4.24.11",
