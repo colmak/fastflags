@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Globe, Hash, X, Search, Eye, Keyboard, Repeat, Sparkles, ChevronRight } from "lucide-react";
+import { Globe, Hash, X, Search, Eye, Keyboard, Repeat, Sparkles } from "lucide-react";
 import { standardRegions } from "@/data/countries";
-import { lotrRegions } from "@/data/lotr";
 import type { GameMode } from "@/components/game/SettingsBar";
 
 interface CommandPaletteProps {
@@ -17,7 +16,7 @@ interface CommandPaletteProps {
   onQuestionCountChange: (count: number | "all") => void;
 }
 
-type NavigationPath = ("main" | "mode" | "region" | "custom-regions" | "lotr" | "questions")[];
+type NavigationPath = ("main" | "mode" | "region" | "questions")[];
 
 export function CommandPalette({
   isOpen,
@@ -33,6 +32,7 @@ export function CommandPalette({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const selectedItemRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,6 +52,16 @@ export function CommandPalette({
   useEffect(() => {
     setSelectedIndex(0);
   }, [searchQuery]);
+
+  // Auto-scroll selected item into view
+  useEffect(() => {
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+  }, [selectedIndex]);
 
   const currentView = navigationPath[navigationPath.length - 1];
 
@@ -151,33 +161,16 @@ export function CommandPalette({
         .filter((r) => fuzzyMatch(r.name, searchQuery))
         .map((r) => ({ ...r, type: "standard" as const }));
 
-      const customRegionOption = fuzzyMatch("Custom regions", searchQuery)
-        ? [
-            {
-              id: "custom-regions",
-              name: "Custom regions",
-              icon: Sparkles,
-              type: "submenu" as const,
-            },
-          ]
-        : [];
-
-      return [...standardRegionOptions, ...customRegionOption];
-    }
-
-    if (currentView === "custom-regions") {
-      return [
+      const customRegionOptions = [
         {
           id: "lotr",
-          name: "Lord of the Rings",
-          description: "Middle-earth regions",
-          type: "submenu" as const,
+          name: "Middle-earth",
+          icon: Sparkles,
+          type: "custom" as const,
         },
-      ].filter((item) => fuzzyMatch(item.name, searchQuery));
-    }
+      ].filter((r) => fuzzyMatch(r.name, searchQuery));
 
-    if (currentView === "lotr") {
-      return lotrRegions.filter((r) => fuzzyMatch(r.name, searchQuery));
+      return [...standardRegionOptions, ...customRegionOptions];
     }
 
     if (currentView === "questions") {
@@ -225,16 +218,7 @@ export function CommandPalette({
           handleSelect("mode", modeItem.value);
         } else if (currentView === "region") {
           const regionItem = selected as { id: string; type?: string };
-          if (regionItem.type === "submenu") {
-            navigateTo(regionItem.id as NavigationPath[number]);
-          } else {
-            handleSelect("region", regionItem.id);
-          }
-        } else if (currentView === "custom-regions") {
-          navigateTo("lotr");
-        } else if (currentView === "lotr") {
-          const lotrItem = selected as typeof lotrRegions[number];
-          handleSelect("region", lotrItem.id);
+          handleSelect("region", regionItem.id);
         } else if (currentView === "questions") {
           handleSelect("questions", selected as number | "all");
         }
@@ -289,6 +273,7 @@ export function CommandPalette({
                   return (
                     <button
                       key={mainItem.id}
+                      ref={isSelected ? selectedItemRef : null}
                       onClick={() => navigateTo(mainItem.id as NavigationPath[number])}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-colors ${
                         isSelected ? "bg-gray-700" : "hover:bg-gray-700"
@@ -319,6 +304,7 @@ export function CommandPalette({
                   return (
                     <button
                       key={m.value}
+                      ref={isSelected ? selectedItemRef : null}
                       onClick={() => handleSelect("mode", m.value)}
                       className={`w-full px-4 py-3 rounded-lg text-left transition-colors flex items-center gap-2 ${
                         mode === m.value
@@ -345,32 +331,15 @@ export function CommandPalette({
             <div className="space-y-1">
               {currentItems.length > 0 ? (
                 currentItems.map((item, index) => {
-                  const regionItem = item as { id: string; name: string; type?: string };
+                  const regionItem = item as { id: string; name: string; type?: string; icon?: React.ComponentType<{ className?: string }> };
                   const isSelected = index === selectedIndex;
-
-                  if (regionItem.type === "submenu") {
-                    return (
-                      <button
-                        key={regionItem.id}
-                        onClick={() => navigateTo(regionItem.id as NavigationPath[number])}
-                        className={`w-full px-4 py-3 rounded-lg text-left transition-colors flex items-center gap-2 ${
-                          isSelected
-                            ? "bg-gray-700 text-gray-300"
-                            : "hover:bg-gray-700 text-gray-300"
-                        }`}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        <span className="text-sm">{regionItem.name}</span>
-                        <ChevronRight className="h-4 w-4 ml-auto" />
-                      </button>
-                    );
-                  }
 
                   return (
                     <button
                       key={regionItem.id}
+                      ref={isSelected ? selectedItemRef : null}
                       onClick={() => handleSelect("region", regionItem.id)}
-                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors ${
+                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors flex items-center gap-2 ${
                         region === regionItem.id
                           ? "bg-yellow-400 text-gray-900"
                           : isSelected
@@ -378,78 +347,8 @@ export function CommandPalette({
                           : "hover:bg-gray-700 text-gray-300"
                       }`}
                     >
+                      {regionItem.icon && <regionItem.icon className="h-4 w-4" />}
                       <span className="text-sm">{regionItem.name}</span>
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="px-4 py-8 text-center text-sm text-gray-500">
-                  No results found
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentView === "custom-regions" && (
-            <div className="space-y-1">
-              {currentItems.length > 0 ? (
-                currentItems.map((item, index) => {
-                  const customRegionItem = item as { id: string; name: string; description: string };
-                  const isSelected = index === selectedIndex;
-                  return (
-                    <button
-                      key={customRegionItem.id}
-                      onClick={() => navigateTo("lotr")}
-                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors flex items-center gap-2 ${
-                        isSelected
-                          ? "bg-gray-700 text-gray-300"
-                          : "hover:bg-gray-700 text-gray-300"
-                      }`}
-                    >
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{customRegionItem.name}</div>
-                        <div className="text-xs text-gray-400">
-                          {customRegionItem.description}
-                        </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  );
-                })
-              ) : (
-                <div className="px-4 py-8 text-center text-sm text-gray-500">
-                  No results found
-                </div>
-              )}
-            </div>
-          )}
-
-          {currentView === "lotr" && (
-            <div className="space-y-1">
-              {currentItems.length > 0 ? (
-                (currentItems as typeof lotrRegions).map((r, index) => {
-                  const isSelected = index === selectedIndex;
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => handleSelect("region", r.id)}
-                      className={`w-full px-4 py-3 rounded-lg text-left transition-colors ${
-                        region === r.id
-                          ? "bg-yellow-400 text-gray-900"
-                          : isSelected
-                          ? "bg-gray-700 text-gray-300"
-                          : "hover:bg-gray-700 text-gray-300"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{r.flag}</span>
-                        <div>
-                          <div className="text-sm font-medium">{r.name}</div>
-                          <div className="text-xs opacity-70">
-                            {r.description}
-                          </div>
-                        </div>
-                      </div>
                     </button>
                   );
                 })
@@ -469,6 +368,7 @@ export function CommandPalette({
                   return (
                     <button
                       key={count}
+                      ref={isSelected ? selectedItemRef : null}
                       onClick={() => handleSelect("questions", count)}
                       className={`w-full px-4 py-3 rounded-lg text-left transition-colors ${
                         questionCount === count
