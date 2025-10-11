@@ -6,15 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:seed": "bun run prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force && bun run db:seed"
+    "lint": "eslint"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.10.0",
-    "@prisma/client": "^6.16.0",
     "@radix-ui/react-slot": "^1.2.3",
     "@types/bcryptjs": "^3.0.0",
     "@types/redis": "^4.0.11",
@@ -28,7 +22,6 @@
     "lucide-react": "^0.543.0",
     "next": "15.5.2",
     "next-auth": "^4.24.11",
-    "prisma": "^6.16.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "redis": "^5.8.2",
