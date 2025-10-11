@@ -4,7 +4,7 @@ import * as FlagIcons from "country-flag-icons/react/3x2";
 interface FlagProps {
   countryCode: string;
   className?: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
 export function Flag({ countryCode, className = "", size = "md" }: FlagProps) {
@@ -14,6 +14,7 @@ export function Flag({ countryCode, className = "", size = "md" }: FlagProps) {
     md: "w-16 h-12",
     lg: "w-24 h-18",
     xl: "w-32 h-24",
+    "2xl": "w-48 h-36",
   };
 
   // Get the flag component from country-flag-icons
@@ -37,7 +38,7 @@ export function Flag({ countryCode, className = "", size = "md" }: FlagProps) {
 interface CustomFlagProps {
   emoji: string;
   className?: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "2xl";
 }
 
 export function CustomFlag({ emoji, className = "", size = "md" }: CustomFlagProps) {
@@ -46,6 +47,7 @@ export function CustomFlag({ emoji, className = "", size = "md" }: CustomFlagPro
     md: "w-16 h-12 text-5xl",
     lg: "w-24 h-18 text-7xl",
     xl: "w-32 h-24 text-9xl",
+    "2xl": "w-48 h-36 text-[150px]",
   };
 
   return (
