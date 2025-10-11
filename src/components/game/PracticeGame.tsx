@@ -352,9 +352,9 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
             <>
               <div className="mb-6 flex justify-center">
                 {currentQuestion.isCustomRegion ? (
-                  <CustomFlag emoji={currentQuestion.flag} size="xl" />
+                  <CustomFlag emoji={currentQuestion.flag} size="2xl" />
                 ) : (
-                  <Flag countryCode={currentQuestion.flag} size="xl" />
+                  <Flag countryCode={currentQuestion.flag} size="2xl" />
                 )}
               </div>
               <p className="text-lg text-gray-300 mb-6">
@@ -482,9 +482,9 @@ export function PracticeGame({ mode, settings, onEndGame }: PracticeGameProps) {
             <>
               <div className="mb-6 flex justify-center">
                 {currentQuestion.isCustomRegion ? (
-                  <CustomFlag emoji={currentQuestion.flag} size="xl" />
+                  <CustomFlag emoji={currentQuestion.flag} size="2xl" />
                 ) : (
-                  <Flag countryCode={currentQuestion.flag} size="xl" />
+                  <Flag countryCode={currentQuestion.flag} size="2xl" />
                 )}
               </div>
               <p className="text-lg text-gray-300 mb-6">
